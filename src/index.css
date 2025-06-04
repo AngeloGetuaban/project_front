@@ -1,0 +1,37 @@
+@import "tailwindcss";
+
+/* Show scrollbars always */
+.scrollbars-always {
+  scrollbar-width: auto; /* Firefox */
+  scrollbar-color: #d1d5db #f3f4f6;
+}
+
+.scrollbars-always::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+.scrollbars-always::-webkit-scrollbar-track {
+  background: #f3f4f6;
+}
+
+.scrollbars-always::-webkit-scrollbar-thumb {
+  background-color: #d1d5db;
+  border-radius: 10px;
+}
+
+@keyframes slide-in {
+  0% {
+    transform: translateX(100%);
+    opacity: 0;
+  }
+  100% {
+    transform: translateX(0%);
+    opacity: 1;
+  }
+}
+
+.animate-slide-in {
+  animation: slide-in 0.4s ease-out forwards;
+}
+
