@@ -1,4 +1,6 @@
 import React, { useEffect, useState } from 'react';
+import LoadingSpinner from '../../components/LoadingSpinner';
+
 
 const DepartmentManagement = () => {
   const [departments, setDepartments] = useState([]);
@@ -41,7 +43,7 @@ const DepartmentManagement = () => {
       </div>
 
       {loading ? (
-        <p className="text-gray-600">Loading departments...</p>
+        <LoadingSpinner />
       ) : (
         <div className="overflow-x-auto bg-white shadow-md rounded-lg">
           <table className="min-w-full text-sm text-left text-gray-700">

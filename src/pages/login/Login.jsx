@@ -27,26 +27,49 @@ const Login = () => {
     setAlert({ type: 'info', message: 'Logging in...' });
 
     try {
-        const userCred = await signInWithEmailAndPassword(auth, email, password);
-        const idToken = await userCred.user.getIdToken();
+      const userCred = await signInWithEmailAndPassword(auth, email, password);
+      const idToken = await userCred.user.getIdToken();
 
-        const response = await fetch(`${API_URL}/api/auth/login`, {
+      const response = await fetch(`${API_URL}/api/auth/login`, {
         method: 'POST',
         headers: { Authorization: `Bearer ${idToken}` },
-        });
+      });
 
-        const data = await response.json();
+      const data = await response.json();
 
-        login(idToken, data.user); // ✅ Store in authContext
+      login(idToken, data.user); // ✅ Store in authContext
 
-        setAlert({ type: 'success', message: 'Login successful!' });
-        setTimeout(() => navigate('/home'), 3000);
+      setAlert({ type: 'success', message: 'Login successful!' });
+      setTimeout(() => navigate('/home'), 3000);
+
     } catch (err) {
-        setAlert({ type: 'error', message: err.message || 'Login failed' });
+      let message = 'Login failed.';
+
+      // Firebase Auth error codes
+      switch (err.code) {
+        case 'auth/user-not-found':
+        case 'auth/invalid-credential':
+          message = 'Invalid email or password.';
+          break;
+        case 'auth/invalid-email':
+          message = 'Please enter a valid email address.';
+          break;
+        case 'auth/too-many-requests':
+          message = 'Too many attempts. Please try again later.';
+          break;
+        case 'auth/network-request-failed':
+          message = 'Network error. Check your connection.';
+          break;
+        default:
+          message = err.message || 'Login failed. Please try again.';
+      }
+
+      setAlert({ type: 'error', message });
     } finally {
-        setLoading(false);
+      setLoading(false);
     }
-};
+  };
+
 
   const handleForgotPassword = async () => {
     if (!email) {

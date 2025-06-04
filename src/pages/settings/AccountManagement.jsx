@@ -36,7 +36,7 @@ const AccountManagement = () => {
     setFormValues(prev => ({ ...prev, [name]: value }));
   };
 
-  const handleSubmit = async () => {
+    const handleSubmit = async () => {
     const nameRegex = /^[A-Za-z\s]+$/;
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     const passwordRegex = /^(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]{6,}$/;
@@ -77,7 +77,10 @@ const AccountManagement = () => {
         first_name,
         last_name,
         role,
-        department: currentUser?.role === 'super_admin' ? department : 'N/A',
+        department:
+          currentUser?.role === 'super_admin'
+            ? department
+            : currentUser?.department || 'N/A',
       };
 
       await axios.post(`${API_URL}/api/super-admin/user`, payload);
@@ -85,11 +88,14 @@ const AccountManagement = () => {
       setAlert({ message: 'User added successfully.', type: 'success' });
       setIsModalOpen(false);
       await fetchUsers();
-    } catch (error) {
-      console.error('Error submitting user:', error);
-      setAlert({ message: 'Failed to add user.', type: 'error' });
-    }
+      } catch (error) {
+        console.error('Error submitting user:', error);
+        const message =
+          error.response?.data?.message || 'Failed to add user. Please try again.';
+        setAlert({ message, type: 'error' });
+      }
   };
+
 
   const fetchUsers = async () => {
     try {
