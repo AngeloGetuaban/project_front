@@ -1,20 +1,20 @@
 import React, { useState, useEffect } from 'react';
+import axios from 'axios';
 import { useAuth } from '../../auth/authContext';
 import { useNavigate } from 'react-router-dom';
+import CustomAlert from '../../components/CustomAlert';
 
 const Account = () => {
-  const { user } = useAuth();
+  const [isSaving, setIsSaving] = useState(false);
+  const API_URL = import.meta.env.VITE_API_URL;
+  const { user, updateUser } = useAuth();
   const navigate = useNavigate();
 
-  // 🔐 Redirect if no user
-  useEffect(() => {
-    if (!user || !user.uid) {
-      navigate('/');
-    }
-  }, [user, navigate]);
-
+  const isRestricted = ['user'].includes(user?.role);
   const editableFields = ['first_name', 'last_name', 'email', 'password'];
   const [editField, setEditField] = useState(null);
+  const [alert, setAlert] = useState(null);
+
   const [formData, setFormData] = useState({
     first_name: user?.first_name || '',
     last_name: user?.last_name || '',
@@ -24,30 +24,82 @@ const Account = () => {
     confirm_password: '',
   });
 
+  useEffect(() => {
+    if (!user || !user.uid) {
+      navigate('/');
+    }
+  }, [user, navigate]);
+
+  const showAlert = (type, message) => {
+    setAlert({ type, message });
+    setTimeout(() => setAlert(null), 4000);
+  };
+
+  const validateEmail = (email) =>
+    /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
+
+  const validatePassword = (password) =>
+    /^(?=.*[A-Z])(?=.*\d)(?=.*[!@#$%^&*()_+\-=[\]{};':"\\|,.<>/?]).{6,}$/.test(password);
+
   const handleInputChange = (field, value) => {
     setFormData(prev => ({ ...prev, [field]: value }));
   };
 
-  const handleSave = (field) => {
-    console.log('Saving update for:', field, '->', formData[field]);
+  const handleSave = async (field) => {
+    setIsSaving(true);
+    try {
+      if (field === 'password') {
+        const { current_password, new_password, confirm_password } = formData;
 
-    // Reset password fields on save
-    if (field === 'password') {
-      console.log('Password update payload:', {
-        current: formData.current_password,
-        new: formData.new_password,
-        confirm: formData.confirm_password,
-      });
-      setFormData(prev => ({
-        ...prev,
-        current_password: '',
-        new_password: '',
-        confirm_password: '',
-      }));
-    }
+        if (!current_password || !new_password || !confirm_password) {
+          showAlert('error', 'Please fill in all password fields.');
+          return;
+        }
 
-    setEditField(null);
-  };
+        if (new_password !== confirm_password) {
+          showAlert('error', 'New passwords do not match.');
+          return;
+        }
+
+        if (!validatePassword(new_password)) {
+          showAlert('error', 'Password must be 6+ characters with uppercase, number, and special character.');
+          return;
+        }
+
+        await axios.patch(`${API_URL}/api/account/user/${user.uid}/password`, {
+          current_password,
+          new_password,
+        });
+
+        showAlert('success', 'Password updated successfully!');
+        setFormData(prev => ({
+          ...prev,
+          current_password: '',
+          new_password: '',
+          confirm_password: '',
+        }));
+      } else {
+        if (field === 'email' && !validateEmail(formData.email)) {
+          showAlert('error', 'Invalid email address.');
+          return;
+        }
+
+        const res = await axios.patch(`${API_URL}/api/account/user/${user.uid}`, {
+          [field]: formData[field],
+        });
+
+        updateUser(res.data.updatedUser);
+        showAlert('success', `${field.replace('_', ' ')} updated!`);
+      }
+
+      setEditField(null);
+    } catch (err) {
+      console.error('Update failed:', err);
+      showAlert('error', err?.response?.data?.message || 'Failed to update. Try again.');
+    }finally {
+    setIsSaving(false); // ✅ Always reset
+  }
+};
 
   const handleCancel = () => {
     setFormData({
@@ -62,16 +114,21 @@ const Account = () => {
   };
 
   const fields = [
-    { key: 'first_name', label: 'First Name', editable: true },
-    { key: 'last_name', label: 'Last Name', editable: true },
-    { key: 'email', label: 'Email', editable: true },
+    { key: 'first_name', label: 'First Name', editable: !isRestricted },
+    { key: 'last_name', label: 'Last Name', editable: !isRestricted },
+    { key: 'email', label: 'Email', editable: !isRestricted },
     { key: 'password', label: 'Password', editable: true },
-    { key: 'role', label: 'Role', editable: false }
+    { key: 'role', label: 'Role', editable: false },
+    { key: 'department', label: 'Department', editable: false }
   ];
 
   return (
     <div>
       <h2 className="text-2xl font-semibold mb-6 text-gray-800">Account Settings</h2>
+
+      {alert && (
+        <CustomAlert type={alert.type} message={alert.message} />
+      )}
 
       <div className="space-y-5">
         {fields.map(({ key, label, editable }) => (

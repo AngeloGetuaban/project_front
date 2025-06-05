@@ -16,6 +16,12 @@ const Login = () => {
   const navigate = useNavigate();
 
   useEffect(() => {
+  if (localStorage.getItem('user') === 'undefined') {
+    localStorage.removeItem('user');
+  }
+}, []);
+
+  useEffect(() => {
     if (user) {
         navigate('/home');
     }

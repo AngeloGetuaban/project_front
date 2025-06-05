@@ -12,13 +12,14 @@ const ModalForm = ({
   onSubmit,
   onClose,
   submitLabel = 'Submit',
+  hideDepartmentDropdown = false,
+  isSubmitting = false,
 }) => {
   const API_URL = import.meta.env.VITE_API_URL;
   const [showPassword, setShowPassword] = useState(false);
   const [departments, setDepartments] = useState([]);
   const { user: currentUser } = useAuth();
 
-  // Fetch departments only for super_admin
   useEffect(() => {
     const fetchDepartments = async () => {
       try {
@@ -36,7 +37,6 @@ const ModalForm = ({
 
   if (!isOpen) return null;
 
-  // Define role options based on current user's role
   const roleOptions =
     currentUser?.role === 'super_admin'
       ? [
@@ -52,6 +52,15 @@ const ModalForm = ({
   return (
     <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center">
       <div className="bg-white rounded-xl shadow-xl w-full max-w-md p-6 relative">
+        {/* ❌ Close Button */}
+        <button
+          onClick={onClose}
+          className="absolute top-3 right-3 text-gray-400 hover:text-gray-700 text-xl font-bold focus:outline-none"
+          aria-label="Close"
+        >
+          &times;
+        </button>
+
         <h2 className="text-xl font-semibold mb-4 text-gray-800">{title}</h2>
 
         <form
@@ -111,7 +120,7 @@ const ModalForm = ({
             </div>
           ))}
 
-          {currentUser?.role === 'super_admin' ? (
+          {!hideDepartmentDropdown && currentUser?.role === 'super_admin' && (
             <div>
               <label className="block text-sm text-gray-600 mb-1">Department</label>
               <select
@@ -128,7 +137,9 @@ const ModalForm = ({
                 ))}
               </select>
             </div>
-          ) : currentUser?.role === 'admin' && (
+          )}
+
+          {!hideDepartmentDropdown && currentUser?.role === 'admin' && (
             <div>
               <label className="block text-sm text-gray-600 mb-1">Department</label>
               <input
@@ -141,20 +152,17 @@ const ModalForm = ({
             </div>
           )}
 
-
           <div className="flex justify-end gap-3 pt-4">
             <button
-              type="button"
-              onClick={onClose}
-              className="px-4 py-2 border border-gray-300 rounded-md hover:bg-gray-100 text-sm"
-            >
-              Cancel
-            </button>
-            <button
               type="submit"
-              className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 text-sm"
+              disabled={isSubmitting}
+              className={`px-4 py-2 rounded-md text-sm ${
+                isSubmitting
+                  ? 'bg-gray-400 cursor-not-allowed text-white'
+                  : 'bg-blue-600 text-white hover:bg-blue-700'
+              }`}
             >
-              {submitLabel}
+              {isSubmitting ? 'Saving...' : submitLabel}
             </button>
           </div>
         </form>

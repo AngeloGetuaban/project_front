@@ -10,9 +10,9 @@ const Manage = () => {
   const [mode, setMode] = useState('none'); // 'none' | 'update' | 'delete'
   const [selectedFiles, setSelectedFiles] = useState([]);
   const navigate = useNavigate();
-
+  const API_URL = import.meta.env.VITE_API_URL;
   useEffect(() => {
-    axios.get('http://localhost:5000/api/contracts')
+    axios.get(`http://${API_URL}/api/csv/contracts`)
       .then(res => setCsvFiles(Object.keys(res.data)))
       .catch(err => console.error('Failed to fetch CSV files', err));
   }, []);
