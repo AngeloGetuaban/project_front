@@ -12,7 +12,7 @@ const Manage = () => {
   const navigate = useNavigate();
   const API_URL = import.meta.env.VITE_API_URL;
   useEffect(() => {
-    axios.get(`http://${API_URL}/api/csv/contracts`)
+    axios.get(`${API_URL}/api/csv/contracts`)
       .then(res => setCsvFiles(Object.keys(res.data)))
       .catch(err => console.error('Failed to fetch CSV files', err));
   }, []);

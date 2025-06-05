@@ -28,7 +28,7 @@ const Search = () => {
   }, [user, navigate]);
 
   useEffect(() => {
-    axios.get(`http://${API_URL}/api/csv/contracts`)
+    axios.get(`${API_URL}/api/csv/contracts`)
       .then(res => {
         setContracts(res.data);
         setContractsList(Object.keys(res.data));
