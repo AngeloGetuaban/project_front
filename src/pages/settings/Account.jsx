@@ -16,6 +16,7 @@ const Account = () => {
   const [alert, setAlert] = useState(null);
 
   const [formData, setFormData] = useState({
+    username: user?.username || '',
     first_name: user?.first_name || '',
     last_name: user?.last_name || '',
     email: user?.email || '',
@@ -103,6 +104,7 @@ const Account = () => {
 
   const handleCancel = () => {
     setFormData({
+      username: user?.username || '',
       first_name: user?.first_name || '',
       last_name: user?.last_name || '',
       email: user?.email || '',
@@ -114,6 +116,7 @@ const Account = () => {
   };
 
   const fields = [
+    { key: 'username', label: 'Username', editable: !isRestricted },
     { key: 'first_name', label: 'First Name', editable: !isRestricted },
     { key: 'last_name', label: 'Last Name', editable: !isRestricted },
     { key: 'email', label: 'Email', editable: !isRestricted },
