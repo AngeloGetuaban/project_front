@@ -28,12 +28,12 @@ const Search = () => {
   }, [user, navigate]);
 
   useEffect(() => {
-    axios.get(`${API_URL}/api/csv/contracts`)
+    axios.get(`${API_URL}/api/csv/database`)
       .then(res => {
         setContracts(res.data);
         setContractsList(Object.keys(res.data));
       })
-      .catch(err => console.error('Error fetching contracts:', err));
+      .catch(err => console.error('Error fetching database:', err));
   }, []);
 
   useEffect(() => {
@@ -170,9 +170,9 @@ const exportToCSV = (data, headers) => {
     <div className="min-h-screen bg-gradient-to-br from-gray-200 via-gray-400 to-gray-600 text-gray-800">
       <div className="p-10">
         {/* Contract Selection */}
-        <div className="mb-10 max-w-6xl mx-auto">
+        <div className="mb-10 max-w-6xl mx-auto"> 
           <div className="flex items-center justify-between mb-4">
-            <h2 className="text-2xl font-semibold text-white">Select a Contract</h2>
+            <h2 className="text-2xl font-semibold text-white">Select a Database</h2>
             <button
               onClick={() => navigate('/home')}
               className="absolute top-5 right-5 z-30 bg-white text-gray-700 px-4 py-2 rounded shadow hover:bg-gray-100"

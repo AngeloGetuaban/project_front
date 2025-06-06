@@ -9,31 +9,55 @@ const API_URL = import.meta.env.VITE_API_URL;
 
 const Login = () => {
   const { user, login } = useAuth();
-  const [email, setEmail] = useState('');
+  const [input, setInput] = useState(''); // username or email
   const [password, setPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
   const [alert, setAlert] = useState(null);
   const [loading, setLoading] = useState(false);
+  const [resetSent, setResetSent] = useState(false);
   const navigate = useNavigate();
 
-  useEffect(() => {
-  if (localStorage.getItem('user') === 'undefined') {
-    localStorage.removeItem('user');
-  }
-}, []);
+  const showAlert = (type, message) => setAlert({ type, message });
 
   useEffect(() => {
-    if (user) {
-        navigate('/home');
+    try {
+      const storedUser = JSON.parse(localStorage.getItem('user'));
+      if (typeof storedUser !== 'object' || storedUser === null) {
+        localStorage.removeItem('user');
+      }
+    } catch {
+      localStorage.removeItem('user');
     }
-    }, [user, navigate]);
+  }, []);
+
+  useEffect(() => {
+    if (user) navigate('/home');
+  }, [user, navigate]);
+
+  const resolveEmail = async (input) => {
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (emailRegex.test(input)) return input;
+
+    const res = await fetch(`${API_URL}/api/auth/resolve-username?input=${input}`);
+    if (!res.ok) throw new Error('Username not found');
+    const data = await res.json();
+    return data.email;
+  };
 
   const handleLogin = async (e) => {
     e.preventDefault();
     setLoading(true);
-    setAlert({ type: 'info', message: 'Logging in...' });
+    showAlert('info', 'Logging in...');
 
     try {
-      const userCred = await signInWithEmailAndPassword(auth, email, password);
+      const resolvedEmail = await resolveEmail(input);
+      if (!resolvedEmail || typeof resolvedEmail !== 'string') {
+        throw new Error('No matching email found for this username.');
+      }
+
+      console.log("Resolved email:", resolvedEmail); // Debug logging
+
+      const userCred = await signInWithEmailAndPassword(auth, resolvedEmail, password);
       const idToken = await userCred.user.getIdToken();
 
       const response = await fetch(`${API_URL}/api/auth/login`, {
@@ -42,56 +66,50 @@ const Login = () => {
       });
 
       const data = await response.json();
+      login(idToken, data.user);
 
-      login(idToken, data.user); // ✅ Store in authContext
-
-      setAlert({ type: 'success', message: 'Login successful!' });
-      setTimeout(() => navigate('/home'), 3000);
-
+      showAlert('success', 'Login successful!');
+      setTimeout(() => navigate('/home'), 2000);
     } catch (err) {
-      let message = 'Login failed.';
+      const code = err?.code;
+      const errorMessages = {
+        'auth/user-not-found': 'Invalid email/username or password.',
+        'auth/invalid-credential': 'Invalid email/username or password.',
+        'auth/invalid-email': 'Invalid email format.',
+        'auth/too-many-requests': 'Too many attempts. Try again later.',
+        'auth/network-request-failed': 'Network error. Check your connection.',
+      };
 
-      // Firebase Auth error codes
-      switch (err.code) {
-        case 'auth/user-not-found':
-        case 'auth/invalid-credential':
-          message = 'Invalid email or password.';
-          break;
-        case 'auth/invalid-email':
-          message = 'Please enter a valid email address.';
-          break;
-        case 'auth/too-many-requests':
-          message = 'Too many attempts. Please try again later.';
-          break;
-        case 'auth/network-request-failed':
-          message = 'Network error. Check your connection.';
-          break;
-        default:
-          message = err.message || 'Login failed. Please try again.';
-      }
-
-      setAlert({ type: 'error', message });
+      showAlert('error', errorMessages[code] || err.message || 'Login failed.');
     } finally {
       setLoading(false);
     }
   };
 
-
   const handleForgotPassword = async () => {
-    if (!email) {
-      setAlert({ type: 'error', message: 'Please enter your email first.' });
+    if (!input) {
+      showAlert('error', 'Please enter your email or username first.');
       return;
     }
+
+    if (resetSent) {
+      showAlert('info', 'Please wait a few moments before retrying.');
+      return;
+    }
+
     try {
-      await sendPasswordResetEmail(auth, email);
-      setAlert({ type: 'success', message: 'Password reset email sent!' });
-    } catch (error) {
-      setAlert({ type: 'error', message: error.message });
+      const resolvedEmail = await resolveEmail(input);
+      await sendPasswordResetEmail(auth, resolvedEmail);
+      showAlert('success', 'Password reset email sent!');
+      setResetSent(true);
+      setTimeout(() => setResetSent(false), 30000);
+    } catch (err) {
+      showAlert('error', err.message || 'Could not send password reset email.');
     }
   };
 
   return (
-    <div className="flex items-center justify-center min-h-screen bg-gradient-to-br from-gray-100 to-gray-300 relative overflow-hidden px-4">
+    <div className="flex items-center justify-center min-h-screen bg-gradient-to-br from-gray-100 to-gray-300 px-4 relative overflow-hidden">
       {alert && (
         <LoginAlert
           message={alert.message}
@@ -103,30 +121,43 @@ const Login = () => {
       <div className="w-full max-w-md bg-white/70 backdrop-blur-md p-8 rounded-2xl shadow-2xl border border-gray-300">
         <h2 className="text-3xl font-bold text-center mb-6 text-gray-800">Welcome Back</h2>
 
-        <form onSubmit={handleLogin}>
-          <div className="mb-5">
-            <label className="block text-sm font-semibold text-gray-700 mb-1">Email</label>
+        <form onSubmit={handleLogin} className="space-y-5">
+          <div>
+            <label className="block text-sm font-semibold text-gray-700 mb-1">
+              Email or Username
+            </label>
             <input
-              type="email"
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
+              type="text"
+              className="w-full px-4 py-2 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+              value={input}
+              onChange={(e) => setInput(e.target.value)}
               required
+              autoComplete="username"
             />
           </div>
 
-          <div className="mb-2">
+          <div>
             <label className="block text-sm font-semibold text-gray-700 mb-1">Password</label>
-            <input
-              type="password"
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              required
-            />
+            <div className="relative">
+              <input
+                type={showPassword ? 'text' : 'password'}
+                className="w-full px-4 py-2 border border-gray-300 rounded-lg shadow-sm pr-12 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                required
+                autoComplete="current-password"
+              />
+              <button
+                type="button"
+                className="absolute top-2.5 right-3 text-sm text-gray-600 hover:text-gray-800"
+                onClick={() => setShowPassword(!showPassword)}
+              >
+                {showPassword ? 'Hide' : 'Show'}
+              </button>
+            </div>
           </div>
 
-          <div className="text-right text-sm mb-6">
+          <div className="text-right text-sm">
             <button
               type="button"
               className="text-blue-600 hover:underline focus:outline-none"
@@ -139,8 +170,9 @@ const Login = () => {
           <button
             type="submit"
             disabled={loading}
-            className={`w-full text-white py-2.5 rounded-lg font-semibold transition duration-200 shadow-md
-              ${loading ? 'bg-blue-400 cursor-not-allowed' : 'bg-blue-600 hover:bg-blue-700'}`}
+            className={`w-full text-white py-2.5 rounded-lg font-semibold transition duration-200 shadow-md ${
+              loading ? 'bg-blue-400 cursor-not-allowed' : 'bg-blue-600 hover:bg-blue-700'
+            }`}
           >
             {loading ? 'Signing In...' : 'Sign In'}
           </button>

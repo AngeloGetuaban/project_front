@@ -15,9 +15,11 @@ const AccountManagement = () => {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isPasswordModalOpen, setIsPasswordModalOpen] = useState(false);
   const [formValues, setFormValues] = useState({
+    username: '',
     first_name: '',
     last_name: '',
     email: '',
+    password: '',
     role: '',
     department: '',
   });
@@ -30,6 +32,7 @@ const AccountManagement = () => {
   const [editingUser, setEditingUser] = useState(null);
 
   const formFields = [
+    { name: 'username', label: 'Username', required: true, type: 'text' },
     { name: 'first_name', label: 'First Name', required: true },
     { name: 'last_name', label: 'Last Name', required: true },
     { name: 'email', label: 'Email', required: true, type: 'email' },
@@ -49,10 +52,19 @@ const AccountManagement = () => {
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     const nameRegex = /^[A-Za-z\s]+$/;
     const passwordRegex = /^(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]{6,}$/;
-    const { first_name, last_name, email, password, role, department } = formValues;
+    const usernameRegex = /^[a-zA-Z0-9_.-]{3,}$/;
 
-    if (!first_name || !last_name || !email || (!isEditMode && !password) || !role) {
+    const { username, first_name, last_name, email, password, role, department } = formValues;
+
+    if (!username || !first_name || !last_name || !email || (!isEditMode && !password) || !role) {
       return setAlert({ message: 'All required fields must be filled.', type: 'error' });
+    }
+
+    if (!usernameRegex.test(username)) {
+      return setAlert({
+        message: 'Username must be at least 3 characters and can include letters, numbers, ., _, or -',
+        type: 'error',
+      });
     }
 
     if (!nameRegex.test(first_name) || !nameRegex.test(last_name)) {
@@ -69,10 +81,12 @@ const AccountManagement = () => {
         type: 'error',
       });
     }
+    console.log(formValues);
 
     try {
       if (isEditMode) {
         const updatePayload = {
+          username,
           first_name,
           last_name,
           email,
@@ -176,9 +190,11 @@ const AccountManagement = () => {
 
   const handleEdit = (user) => {
     setFormValues({
+      username: user.username,
       first_name: user.first_name,
       last_name: user.last_name,
       email: user.email,
+      password: '',
       role: user.role,
       department: user.department,
     });
@@ -205,6 +221,7 @@ const AccountManagement = () => {
           className="bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700"
           onClick={() => {
             setFormValues({
+              username: '',
               first_name: '',
               last_name: '',
               email: '',
@@ -235,6 +252,7 @@ const AccountManagement = () => {
           <table className="min-w-full text-sm text-left text-gray-700">
             <thead className="bg-gray-100 text-xs uppercase text-gray-600">
               <tr>
+                <th className="px-6 py-3">Username</th>
                 <th className="px-6 py-3">First Name</th>
                 <th className="px-6 py-3">Last Name</th>
                 <th className="px-6 py-3">Email</th>
@@ -246,6 +264,7 @@ const AccountManagement = () => {
             <tbody>
               {users.map((u, i) => (
                 <tr key={i} className="border-b hover:bg-gray-50">
+                  <td className="px-6 py-4">{u.username}</td>
                   <td className="px-6 py-4">{u.first_name}</td>
                   <td className="px-6 py-4">{u.last_name}</td>
                   <td className="px-6 py-4">{u.email}</td>
@@ -281,7 +300,7 @@ const AccountManagement = () => {
               ))}
               {users.length === 0 && (
                 <tr>
-                  <td colSpan="6" className="text-center py-4 text-gray-400">
+                  <td colSpan="7" className="text-center py-4 text-gray-400">
                     No users found.
                   </td>
                 </tr>
