@@ -9,9 +9,12 @@ import autoTable from 'jspdf-autotable';
 
 const Search = () => {
   const navigate = useNavigate();
-  const [contracts, setContracts] = useState({});
-  const [contractsList, setContractsList] = useState([]);
-  const [selectedContract, setSelectedContract] = useState('');
+  const { user } = useAuth();
+  const API_URL = import.meta.env.VITE_API_URL;
+
+  const [databasesByDept, setDatabasesByDept] = useState({});
+  const [selectedDatabase, setSelectedDatabase] = useState(null);
+  const [contracts, setContracts] = useState([]);
   const [columns, setColumns] = useState([]);
   const [visibleColumns, setVisibleColumns] = useState([]);
   const [extraColumns, setExtraColumns] = useState([]);
@@ -19,270 +22,200 @@ const Search = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [showColumnPicker, setShowColumnPicker] = useState(false);
   const [showExportOptions, setShowExportOptions] = useState(false);
-  const { user } = useAuth();
-  const API_URL = import.meta.env.VITE_API_URL;
+  const [passwordPrompt, setPasswordPrompt] = useState('');
+  const [isUnlocked, setIsUnlocked] = useState(false);
+  const [error, setError] = useState('');
+
   useEffect(() => {
-    if (!user || !user.uid) {
-      navigate('/');
-    }
+    if (!user || !user.uid) navigate('/');
   }, [user, navigate]);
 
   useEffect(() => {
-    axios.get(`${API_URL}/api/csv/database`)
+    axios.get(`${API_URL}/api/database/databases`)
       .then(res => {
-        setContracts(res.data);
-        setContractsList(Object.keys(res.data));
+        const grouped = {};
+        res.data.sheets.forEach(db => {
+          if (!grouped[db.department_name]) grouped[db.department_name] = [];
+          grouped[db.department_name].push(db);
+        });
+        setDatabasesByDept(grouped);
       })
-      .catch(err => console.error('Error fetching database:', err));
+      .catch(err => console.error('Failed to fetch database list:', err));
   }, []);
 
-  useEffect(() => {
-    if (selectedContract && contracts[selectedContract]?.length > 0) {
-      const sample = contracts[selectedContract][0];
-      const keys = Object.keys(sample);
-      setColumns(keys);
-      setVisibleColumns(keys.slice(0, 3));
-      setExtraColumns(keys.slice(3));
-      setActiveFilters({});
-      setSearchTerm('');
-    }
-  }, [selectedContract]);
+  const handleSelectDatabase = (db) => {
+    setSelectedDatabase(db);
+    setPasswordPrompt('');
+    setError('');
+    setIsUnlocked(false);
+  };
 
-  const toggleExtraColumn = (col) => {
-    if (visibleColumns.includes(col)) {
-      setVisibleColumns(visibleColumns.filter(c => c !== col));
-    } else {
-      setVisibleColumns([...visibleColumns, col]);
-    }
+  const confirmPassword = () => {
+    axios.post(`${API_URL}/api/database/confirm-password`, {
+      sheet_id: selectedDatabase.sheet_id,
+      input_password: passwordPrompt,
+    })
+      .then(() => {
+        axios.get(`${API_URL}/api/database/${selectedDatabase.sheet_id}`)
+          .then(res => {
+            const data = res.data;
+            setContracts(data);
+            const keys = Object.keys(data[0] || []);
+            setColumns(keys);
+            setVisibleColumns(keys.slice(0, 3));
+            setExtraColumns(keys.slice(3));
+            setIsUnlocked(true);
+          })
+          .catch(err => console.error('Failed to load sheet data', err));
+      })
+      .catch(() => {
+        setError('Incorrect password. Please try again.');
+      });
   };
 
   const getFormattedTimestamp = () => {
     const now = new Date();
-    const pad = (n) => String(n).padStart(2, '0');
-
-    const date = `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}`;
-    const time = `${pad(now.getHours())}-${pad(now.getMinutes())}-${pad(now.getSeconds())}`;
-
-    return `${date}_${time}`;
+    return `${now.toISOString().slice(0, 19).replace(/[:T]/g, '-')}`;
   };
 
-  const getColumnOptions = (col) => {
-    const rows = contracts[selectedContract];
-    const values = new Set();
-    rows.forEach(row => values.add(row[col]));
-    return ['All', ...Array.from(values)];
+  const exportToCSV = (data, headers) => {
+    const timestamp = getFormattedTimestamp();
+    const filename = `${selectedDatabase.database_name}_${timestamp}.csv`;
+    const csvContent = [
+      headers.join(','),
+      ...data.map(row => headers.map(header => `"${(row[header] ?? '').toString().replace(/"/g, '""')}"`).join(','))
+    ].join('\n');
+
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.setAttribute('href', url);
+    link.setAttribute('download', filename);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
   };
-
-  const handleDropdownSelect = (col, value) => {
-    setActiveFilters({ ...activeFilters, [col]: value });
-  };
-
-  const getFilteredRows = () => {
-    if (!selectedContract) return [];
-    const rows = contracts[selectedContract];
-    const activeDropdowns = Object.entries(activeFilters).filter(([_, val]) => val !== 'All');
-
-    return rows.filter(row => {
-      const matchesDropdowns = activeDropdowns.every(([col, val]) => row[col] === val);
-      const searchLower = searchTerm.toLowerCase();
-      const matchesSearch = Object.values(row).some(val =>
-        val?.toString().toLowerCase().includes(searchLower)
-      );
-      if (activeDropdowns.length === 0) return matchesSearch;
-      return matchesDropdowns && matchesSearch;
-    });
-  };
-
-const exportToCSV = (data, headers) => {
-  const timestamp = getFormattedTimestamp();
-  const filename = `${selectedContract.replace('.csv', '')}_${timestamp}.csv`;
-
-  const csvContent = [
-    headers.join(','),
-    ...data.map(row =>
-      headers.map(header => `"${(row[header] ?? '').toString().replace(/"/g, '""')}"`).join(',')
-    ),
-  ].join('\n');
-
-  const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-  const url = URL.createObjectURL(blob);
-  const link = document.createElement('a');
-  link.setAttribute('href', url);
-  link.setAttribute('download', filename);
-  document.body.appendChild(link);
-  link.click();
-  document.body.removeChild(link);
-};
 
   const exportToPDF = (data, headers) => {
     const doc = new jsPDF({ orientation: 'landscape' });
     const timestamp = getFormattedTimestamp();
-    const name = selectedContract.replace('.csv', '');
-    const filename = `${name}_${timestamp}.pdf`;
-
-    const titleText = `${name} - Export on ${timestamp.replace(/_/g, ' ')}`;
-
-    // Truncate to avoid giant cell heights
-    const truncate = (text, max = 100) =>
-      typeof text === 'string' && text.length > max ? text.slice(0, max) + '…' : (text ?? '');
-
+    const filename = `${selectedDatabase.database_name}_${timestamp}.pdf`;
+    doc.text(`${selectedDatabase.database_name} Export - ${timestamp}`, 14, 15);
     const tableData = data.map(row =>
-      headers.map(h => {
-        const val = row[h];
-        if (val === null || val === undefined) return '';
-        if (typeof val === 'object') return truncate(JSON.stringify(val));
-        return truncate(val.toString());
-      })
+      headers.map(h => (row[h] ?? '').toString().slice(0, 100))
     );
-
-    // Draw title
-    doc.setFontSize(10);
-    doc.text(titleText, 14, 15);
 
     autoTable(doc, {
       startY: 20,
       head: [headers],
       body: tableData,
-      styles: {
-        fontSize: 8,
-        overflow: 'linebreak',
-        cellPadding: 2,
-        valign: 'top',
-      },
-      headStyles: {
-        fillColor: [41, 128, 185],
-        textColor: 255,
-        fontStyle: 'bold',
-      },
-      theme: 'striped',
-      pageBreak: 'auto',
-      tableWidth: 'wrap',               // Let table naturally span multiple pages
-      horizontalPageBreak: true,        // ✅ Move extra columns to next page
-      horizontalPageBreakRepeat: 1,     // ✅ Repeat the first column (adjust as needed)
+      styles: { fontSize: 8, overflow: 'linebreak' },
+      headStyles: { fillColor: [41, 128, 185], textColor: 255 },
     });
 
     doc.save(filename);
+  };
+
+  const getColumnOptions = (col) => {
+    return ['All', ...[...new Set(contracts.map(r => r[col] || 'N/A'))]];
+  };
+
+  const handleDropdownSelect = (col, value) => {
+    setActiveFilters(prev => ({
+      ...prev,
+      [col]: value
+    }));
+  };
+
+  const toggleExtraColumn = (col) => {
+    setVisibleColumns(prev =>
+      prev.includes(col)
+        ? prev.filter(c => c !== col)
+        : [...prev, col]
+    );
+  };
+
+  const getFilteredRows = () => {
+    const activeDropdowns = Object.entries(activeFilters).filter(([_, val]) => val !== 'All');
+    return contracts.filter(row => {
+      const matchFilters = activeDropdowns.every(([col, val]) => (row[col] ?? 'N/A') === val);
+      const matchSearch = Object.values(row).some(val =>
+        (val ?? 'N/A').toString().toLowerCase().includes(searchTerm.toLowerCase())
+      );
+      return activeDropdowns.length ? (matchFilters && matchSearch) : matchSearch;
+    });
   };
 
   const filteredRows = getFilteredRows();
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-200 via-gray-400 to-gray-600 text-gray-800">
-      <div className="p-10">
-        {/* Contract Selection */}
-        <div className="mb-10 max-w-6xl mx-auto"> 
-          <div className="flex items-center justify-between mb-4">
-            <h2 className="text-2xl font-semibold text-white">Select a Database</h2>
-            <button
-              onClick={() => navigate('/home')}
-              className="absolute top-5 right-5 z-30 bg-white text-gray-700 px-4 py-2 rounded shadow hover:bg-gray-100"
-            >
-              ← Back to Home
-            </button>
-          </div>
+      <div className="p-10 max-w-6xl mx-auto">
+        <h2 className="text-2xl font-semibold text-white mb-6">Select a Database</h2>
+        <button
+          onClick={() => navigate('/home')}
+          className="absolute top-5 right-5 z-30 bg-white text-gray-700 px-4 py-2 rounded shadow hover:bg-gray-100"
+        >
+          ← Back to Home
+        </button>
 
-          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-            {contractsList.map((filename) => (
-              <div
-                key={filename}
-                className={`cursor-pointer p-4 rounded-xl shadow-md text-center text-sm font-medium 
-                ${selectedContract === filename ? 'bg-blue-600 text-white' : 'bg-white text-gray-800'}
-                hover:bg-blue-500 hover:text-white transition`}
-                onClick={() => setSelectedContract(filename)}
-              >
-                {filename.replace('.csv', '')}
-              </div>
-            ))}
-          </div>
-        </div>
-
-        {/* Filters */}
-        {selectedContract && (
-          <div className="bg-white shadow-md rounded-xl p-6 mb-10 max-w-6xl mx-auto relative">
-            <div className="flex items-center justify-between mb-6">
-              <h2 className="text-2xl font-semibold">Search Filters</h2>
-
-              {extraColumns.length > 0 && (
-                <div className="relative">
-                  <button
-                    onClick={() => setShowColumnPicker(!showColumnPicker)}
-                    className="p-2 bg-gray-100 hover:bg-gray-200 rounded-full border border-gray-300"
-                  >
-                    <FaEllipsisV />
-                  </button>
-
-                  {showColumnPicker && (
-                    <div className="absolute top-12 z-50 right-0 bg-white shadow-xl ring-1 ring-black ring-opacity-5 rounded-lg p-4 w-64">
-                      <h4 className="text-sm font-semibold mb-2">Add Filters</h4>
-                      <div className="max-h-60 z-50 overflow-y-auto">
-                        {extraColumns.map((col, i) => (
-                          <label key={i} className="block text-sm mb-1">
-                            <input
-                              type="checkbox"
-                              className="mr-2"
-                              checked={visibleColumns.includes(col)}
-                              onChange={() => toggleExtraColumn(col)}
-                            />
-                            {col}
-                          </label>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-                </div>
-              )}
-            </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-4 items-end mb-6">
-              <div className="md:col-span-4">
-                <label className="block mb-2 font-medium">Search Input</label>
-                <input
-                  type="text"
-                  placeholder="Type to search all data..."
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                  className="w-full px-4 py-2 rounded-lg border border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-400"
-                />
-              </div>
-
-              {visibleColumns.map((col, idx) => (
-                <div key={`${col}-${idx}`}>
-                  <label className="block mb-2 font-medium">{col}</label>
-                  <DropDown
-                    label="All"
-                    options={getColumnOptions(col)}
-                    onSelect={(val) => handleDropdownSelect(col, val)}
-                  />
+        {Object.entries(databasesByDept).map(([dept, list]) => (
+          <div key={dept} className="mb-8">
+            <h3 className="text-lg text-white font-semibold mb-2">{dept}</h3>
+            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+              {list.map(db => (
+                <div
+                  key={db.id}
+                  className="cursor-pointer p-4 rounded-xl shadow-md bg-white hover:bg-blue-600 hover:text-white"
+                  onClick={() => handleSelectDatabase(db)}
+                >
+                  {db.database_name}
                 </div>
               ))}
             </div>
           </div>
+        ))}
+
+        {/* Password Modal */}
+        {selectedDatabase && !isUnlocked && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center">
+            <div className="bg-white p-6 rounded-lg shadow-lg w-96">
+              <h3 className="text-lg font-semibold mb-4">Enter Password</h3>
+              <input
+                type="password"
+                value={passwordPrompt}
+                onChange={(e) => setPasswordPrompt(e.target.value)}
+                className="w-full border border-gray-300 rounded px-3 py-2 mb-2"
+              />
+              {error && <p className="text-red-600 text-sm mb-2">{error}</p>}
+              <div className="flex justify-end space-x-2">
+                <button onClick={() => setSelectedDatabase(null)} className="px-4 py-2 border rounded">Cancel</button>
+                <button onClick={confirmPassword} className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700">Submit</button>
+              </div>
+            </div>
+          </div>
         )}
 
-        {/* Results */}
-        {selectedContract && (
-          <div className="bg-white shadow-md rounded-xl px-6 py-4 max-w-6xl mx-auto">
+        {/* Data View */}
+        {isUnlocked && (
+          <div className="bg-white shadow-md rounded-xl px-6 py-4 mt-10">
             <div className="flex items-center justify-between mb-4">
               <h2 className="text-xl font-semibold">Results ({filteredRows.length})</h2>
               <div className="relative">
                 <button
-                  className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition"
+                  className="bg-blue-600 text-white px-4 py-2 rounded-lg"
                   onClick={() => setShowExportOptions(prev => !prev)}
                 >
                   Export ▼
                 </button>
                 {showExportOptions && (
                   <div className="absolute right-0 mt-2 bg-white border rounded shadow-lg z-20">
-                    <button
-                      className="block px-4 py-2 hover:bg-gray-100 w-full text-left"
-                      onClick={() => exportToCSV(filteredRows, columns)}
-                    >
+                    <button className="block px-4 py-2 hover:bg-gray-100 w-full text-left"
+                      onClick={() => exportToCSV(filteredRows, columns)}>
                       Export as CSV
                     </button>
-                    <button
-                      className="block px-4 py-2 hover:bg-gray-100 w-full text-left"
-                      onClick={() => exportToPDF(filteredRows, columns)}
-                    >
+                    <button className="block px-4 py-2 hover:bg-gray-100 w-full text-left"
+                      onClick={() => exportToPDF(filteredRows, columns)}>
                       Export as PDF
                     </button>
                   </div>
@@ -290,39 +223,84 @@ const exportToCSV = (data, headers) => {
               </div>
             </div>
 
-            <div className="overflow-x-scroll overflow-y-scroll h-[500px] border rounded-md scrollbars-always">
-              {filteredRows.length === 0 ? (
-                <p className="text-gray-500 p-4">No results found for selected filters.</p>
-              ) : (
-                <table className="min-w-[1200px] table-fixed border-collapse border border-gray-300 text-sm">
-                  <thead className="bg-gray-100 text-left sticky top-0 z-10">
-                    <tr>
-                      {columns.map((col, idx) => (
-                        <th
-                          key={idx}
-                          className="border px-4 py-3 font-medium text-gray-700 whitespace-nowrap bg-gray-100"
-                        >
-                          {col}
-                        </th>
+            {/* Filters */}
+            <div className="mb-6">
+              <div className="flex items-center justify-between mb-4">
+                <label className="text-lg font-semibold">Filters</label>
+                {extraColumns.length > 0 && (
+                  <div className="relative">
+                    <button
+                      onClick={() => setShowColumnPicker(!showColumnPicker)}
+                      className="p-2 bg-gray-100 hover:bg-gray-200 rounded-full border border-gray-300"
+                    >
+                      <FaEllipsisV />
+                    </button>
+                    {showColumnPicker && (
+                      <div className="absolute top-12 right-0 bg-white shadow-xl ring-1 ring-black ring-opacity-5 rounded-lg p-4 w-64 z-50">
+                        <h4 className="text-sm font-semibold mb-2">Add Filters</h4>
+                        <div className="max-h-60 overflow-y-auto">
+                          {extraColumns.map((col, i) => (
+                            <label key={i} className="block text-sm mb-1">
+                              <input
+                                type="checkbox"
+                                className="mr-2"
+                                checked={visibleColumns.includes(col)}
+                                onChange={() => toggleExtraColumn(col)}
+                              />
+                              {col}
+                            </label>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+
+              <input
+                type="text"
+                placeholder="Search all data..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="w-full px-4 py-2 rounded-lg border mb-4"
+              />
+
+              <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                {visibleColumns.map((col, idx) => (
+                  <div key={`${col}-${idx}`}>
+                    <label className="block font-medium">{col}</label>
+                    <DropDown
+                      label="All"
+                      options={getColumnOptions(col)}
+                      onSelect={(val) => handleDropdownSelect(col, val)}
+                    />
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* Data Table */}
+            <div className="overflow-x-auto max-h-[800px] border rounded-md">
+              <table className="table-auto min-w-full text-sm border-collapse">
+                <thead className="bg-gray-100 sticky top-0">
+                  <tr>
+                    {columns.map(col => (
+                      <th key={col} className="border px-4 py-2">{col}</th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {filteredRows.map((row, i) => (
+                    <tr key={i} className="hover:bg-gray-50">
+                      {columns.map(col => (
+                        <td key={col} className="border px-4 py-2">
+                          {(row[col] ?? '').toString().trim() !== '' ? row[col] : <span className="text-gray-400 italic">N/A</span>}
+                        </td>
                       ))}
                     </tr>
-                  </thead>
-                  <tbody>
-                    {filteredRows.map((row, rowIdx) => (
-                      <tr key={rowIdx} className="hover:bg-gray-50">
-                        {columns.map((col, colIdx) => (
-                          <td
-                            key={colIdx}
-                            className="border px-4 py-3 whitespace-nowrap text-gray-800"
-                          >
-                            {row[col]}
-                          </td>
-                        ))}
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              )}
+                  ))}
+                </tbody>
+              </table>
             </div>
           </div>
         )}
