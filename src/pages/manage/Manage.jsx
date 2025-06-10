@@ -3,16 +3,17 @@ import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import Container from './components/Container';
 import AddModal from './components/AddModal';
-import UpdateModal from './components/updateModal'; // <- import UpdateModal
+import UpdateModal from './components/updateModal';
+import SpinnerOverlay from '../../components/spinningOverlay'; // <-- Spinner component
 
 const Manage = () => {
   const [showAddModal, setShowAddModal] = useState(false);
   const [showUpdateModal, setShowUpdateModal] = useState(false);
   const [activeSheet, setActiveSheet] = useState(null);
-
   const [sheets, setSheets] = useState([]);
   const [mode, setMode] = useState('none');
   const [selectedSheets, setSelectedSheets] = useState([]);
+  const [loading, setLoading] = useState(true); // <-- loading state
 
   const navigate = useNavigate();
   const API_URL = import.meta.env.VITE_API_URL;
@@ -23,18 +24,19 @@ const Manage = () => {
 
   const fetchSheets = async () => {
     try {
+      setLoading(true);
       const res = await axios.get(`${API_URL}/api/database/databases`);
       setSheets(res.data.sheets || []);
     } catch (err) {
       console.error('Failed to fetch Google Sheets', err);
+    } finally {
+      setLoading(false);
     }
   };
 
   const toggleSelect = (id) => {
     setSelectedSheets(prev =>
-      prev.includes(id)
-        ? prev.filter(f => f !== id)
-        : [...prev, id]
+      prev.includes(id) ? prev.filter(f => f !== id) : [...prev, id]
     );
   };
 
@@ -54,6 +56,8 @@ const Manage = () => {
 
   return (
     <div className="relative min-h-screen bg-gradient-to-br from-gray-200 via-gray-400 to-gray-600 p-10 text-center">
+      {loading && <SpinnerOverlay />}
+
       {(mode === 'update' || mode === 'delete') && (
         <div className="absolute inset-0 bg-black bg-opacity-50 z-10 pointer-events-none" />
       )}
@@ -69,39 +73,27 @@ const Manage = () => {
 
       <div className="flex justify-center gap-10 mb-10 relative z-20">
         <div className={mode !== 'none' && mode !== 'add' ? 'opacity-40 pointer-events-none' : ''}>
-          <Container
-            title="Add"
-            icon="➕"
-            onClick={() => { resetMode(); setShowAddModal(true); }}
-          />
+          <Container title="Add" icon="➕" onClick={() => { resetMode(); setShowAddModal(true); }} />
         </div>
         <div className={mode !== 'none' && mode !== 'update' ? 'opacity-40 pointer-events-none' : ''}>
-          <Container
-            title="Update"
-            icon="✏️"
-            onClick={() => setMode(isActive('update') ? 'none' : 'update')}
-          />
+          <Container title="Update" icon="✏️" onClick={() => setMode(isActive('update') ? 'none' : 'update')} />
         </div>
         <div className={mode !== 'none' && mode !== 'delete' ? 'opacity-40 pointer-events-none' : ''}>
-          <Container
-            title="Delete"
-            icon="🗑️"
-            onClick={() => setMode(isActive('delete') ? 'none' : 'delete')}
-          />
+          <Container title="Delete" icon="🗑️" onClick={() => setMode(isActive('delete') ? 'none' : 'delete')} />
         </div>
       </div>
 
-      <div className="bg-white rounded-lg shadow-md max-w-4xl mx-auto p-6 text-left relative z-20">
-        <h2 className="text-xl font-semibold mb-4">Available Sheets</h2>
+      <div className="bg-white rounded-lg shadow-md max-w-6xl mx-auto p-6 text-left relative z-20">
+        <h2 className="text-xl font-semibold mb-4">Available Databases</h2>
         {sheets.length === 0 ? (
           <p className="text-gray-500">No Google Sheets found.</p>
         ) : (
-          <ul className="space-y-2">
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
             {sheets.map((sheet, idx) => (
-              <li
+              <div
                 key={sheet.id || idx}
-                className="flex items-center space-x-3 cursor-pointer hover:bg-gray-100 px-2 py-1 rounded"
                 onClick={() => handleSheetClick(sheet)}
+                className="flex items-center justify-between gap-2 p-4 border border-gray-200 rounded-lg shadow-sm bg-white hover:bg-gray-100 cursor-pointer"
               >
                 {mode === 'delete' && (
                   <input
@@ -111,21 +103,18 @@ const Manage = () => {
                     className="w-4 h-4"
                   />
                 )}
-                <a
-                  href={mode === 'update' ? undefined : sheet.sheet_url || sheet.webViewLink}
-                  target={mode === 'update' ? undefined : '_blank'}
-                  rel="noopener noreferrer"
-                  className={`text-blue-600 hover:underline ${mode === 'update' ? 'pointer-events-none text-black' : ''}`}
-                >
+                <div className="flex-1 text-gray-800 font-medium">
                   {sheet.database_name || sheet.name}
-                </a>
-              </li>
+                </div>
+              </div>
             ))}
-          </ul>
+          </div>
         )}
       </div>
 
-      {showAddModal && <AddModal onClose={() => setShowAddModal(false)} onCreated={fetchSheets} />}
+      {showAddModal && (
+        <AddModal onClose={() => setShowAddModal(false)} onCreated={fetchSheets} />
+      )}
       {showUpdateModal && (
         <UpdateModal
           sheet={activeSheet}

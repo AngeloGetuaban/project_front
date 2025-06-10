@@ -6,6 +6,7 @@ import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../auth/authContext';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
+import SpinnerOverlay from '../../components/spinningOverlay'; // Updated to support message
 
 const Search = () => {
   const navigate = useNavigate();
@@ -25,12 +26,15 @@ const Search = () => {
   const [passwordPrompt, setPasswordPrompt] = useState('');
   const [isUnlocked, setIsUnlocked] = useState(false);
   const [error, setError] = useState('');
+  const [loadingDatabases, setLoadingDatabases] = useState(true);
+  const [loadingTableData, setLoadingTableData] = useState(false);
 
   useEffect(() => {
     if (!user || !user.uid) navigate('/');
   }, [user, navigate]);
 
   useEffect(() => {
+    setLoadingDatabases(true);
     axios.get(`${API_URL}/api/database/databases`)
       .then(res => {
         const grouped = {};
@@ -40,7 +44,8 @@ const Search = () => {
         });
         setDatabasesByDept(grouped);
       })
-      .catch(err => console.error('Failed to fetch database list:', err));
+      .catch(err => console.error('Failed to fetch database list:', err))
+      .finally(() => setLoadingDatabases(false));
   }, []);
 
   const handleSelectDatabase = (db) => {
@@ -51,6 +56,7 @@ const Search = () => {
   };
 
   const confirmPassword = () => {
+    setLoadingTableData(true);
     axios.post(`${API_URL}/api/database/confirm-password`, {
       sheet_id: selectedDatabase.sheet_id,
       input_password: passwordPrompt,
@@ -66,10 +72,12 @@ const Search = () => {
             setExtraColumns(keys.slice(3));
             setIsUnlocked(true);
           })
-          .catch(err => console.error('Failed to load sheet data', err));
+          .catch(err => console.error('Failed to load sheet data', err))
+          .finally(() => setLoadingTableData(false));
       })
       .catch(() => {
         setError('Incorrect password. Please try again.');
+        setLoadingTableData(false);
       });
   };
 
@@ -150,6 +158,9 @@ const Search = () => {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-200 via-gray-400 to-gray-600 text-gray-800">
+      {loadingDatabases && <SpinnerOverlay message="Loading databases..." />}
+      {loadingTableData && <SpinnerOverlay message="Unlocking and loading data..." />}
+
       <div className="p-10 max-w-6xl mx-auto">
         <h2 className="text-2xl font-semibold text-white mb-6">Select a Database</h2>
         <button
@@ -177,7 +188,7 @@ const Search = () => {
         ))}
 
         {/* Password Modal */}
-        {selectedDatabase && !isUnlocked && (
+        {selectedDatabase && !isUnlocked && !loadingTableData && (
           <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center">
             <div className="bg-white p-6 rounded-lg shadow-lg w-96">
               <h3 className="text-lg font-semibold mb-4">Enter Password</h3>
@@ -196,7 +207,7 @@ const Search = () => {
           </div>
         )}
 
-        {/* Data View */}
+        {/* Table View */}
         {isUnlocked && (
           <div className="bg-white shadow-md rounded-xl px-6 py-4 mt-10">
             <div className="flex items-center justify-between mb-4">

@@ -32,7 +32,7 @@ const NavBar = () => {
         {isSettingsPage && (
           <button
             onClick={() => navigate('/home')}
-            className="bg-blue-600 text-white px-4 py-1.5 rounded-md hover:bg-blue-700 transition text-sm"
+            className="bg-white text-black px-4 py-1.5 rounded-md hover:bg-blue-700 transition text-sm"
           >
             ← Back to Home
           </button>

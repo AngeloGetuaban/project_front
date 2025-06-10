@@ -35,6 +35,12 @@ const AddModal = ({ onClose, onCreated }) => {
     setColumns(newCols);
   };
 
+  const handleRemoveColumn = (index) => {
+    const newCols = [...columns];
+    newCols.splice(index, 1);
+    setColumns(newCols);
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
 
@@ -69,84 +75,114 @@ const AddModal = ({ onClose, onCreated }) => {
     <div className="fixed inset-0 bg-black bg-opacity-50 flex justify-center items-center z-50">
       <div className="bg-white w-[90%] max-w-lg h-[580px] rounded-xl shadow-xl relative overflow-hidden">
         <div className="p-6 overflow-y-auto h-full">
-          <h2 className="text-xl font-semibold mb-4">Create New Google Sheet</h2>
+          <h2 className="text-2xl font-bold mb-6 text-gray-800">
+            Create New Google Sheet
+          </h2>
 
           <form onSubmit={handleSubmit}>
-            <label className="block font-medium mb-2">Database Title</label>
-            <input
-              type="text"
-              value={title}
-              onChange={e => setTitle(e.target.value)}
-              required
-              className="w-full mb-4 px-4 py-2 border rounded-lg"
-            />
-
-            <label className="block font-medium mb-2">Database Password</label>
-            <input
-              type="password"
-              value={databasePassword}
-              onChange={e => setDatabasePassword(e.target.value)}
-              required
-              className="w-full mb-4 px-4 py-2 border rounded-lg"
-            />
-
-            <label className="block font-medium mb-2">Department</label>
-            <select
-              value={departmentName}
-              onChange={e => setDepartmentName(e.target.value)}
-              required
-              className="w-full mb-4 px-4 py-2 border rounded-lg"
-            >
-              <option value="" disabled>Select a department</option>
-              {departments.map(dept => (
-                <option key={dept.id} value={dept.department_name}>
-                  {dept.department_name}
-                </option>
-              ))}
-            </select>
-
-            <label className="block font-medium mb-2">Created By</label>
-            <input
-              type="text"
-              value={createdBy}
-              readOnly
-              className="w-full mb-4 px-4 py-2 border rounded-lg bg-gray-100 text-gray-600"
-            />
-
-            <label className="block font-medium mb-2">Columns</label>
-            {columns.map((col, idx) => (
+            {/* Database Title */}
+            <div className="mb-4">
+              <label className="block font-medium mb-1">Database Title</label>
               <input
-                key={idx}
                 type="text"
-                value={col}
-                onChange={e => handleChangeColumn(idx, e.target.value)}
-                placeholder={`Column ${idx + 1}`}
-                className="w-full mb-2 px-4 py-2 border rounded-lg"
+                value={title}
+                onChange={e => setTitle(e.target.value)}
+                required
+                className="w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
               />
-            ))}
+            </div>
 
-            <button
-              type="button"
-              onClick={handleAddColumn}
-              className="mb-4 text-blue-600 hover:underline text-sm"
-            >
-              + Add another column
-            </button>
+            {/* Database Password */}
+            <div className="mb-4">
+              <label className="block font-medium mb-1">Database Password</label>
+              <input
+                type="password"
+                value={databasePassword}
+                onChange={e => setDatabasePassword(e.target.value)}
+                required
+                className="w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+              />
+            </div>
 
-            {error && <p className="text-red-600 text-sm">{error}</p>}
+            {/* Department */}
+            <div className="mb-4">
+              <label className="block font-medium mb-1">Department</label>
+              <select
+                value={departmentName}
+                onChange={e => setDepartmentName(e.target.value)}
+                required
+                className="w-full px-4 py-2 border rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+              >
+                <option value="" disabled>Select a department</option>
+                {departments.map(dept => (
+                  <option key={dept.id} value={dept.department_name}>
+                    {dept.department_name}
+                  </option>
+                ))}
+              </select>
+            </div>
 
-            <div className="flex justify-end space-x-4 mt-4">
+            {/* Created By */}
+            <div className="mb-4">
+              <label className="block font-medium mb-1">Created By</label>
+              <input
+                type="text"
+                value={createdBy}
+                readOnly
+                className="w-full px-4 py-2 border rounded-lg bg-gray-100 text-gray-600"
+              />
+            </div>
+
+            {/* Dynamic Columns */}
+            <div className="mb-4">
+              <label className="block font-medium mb-1">Columns</label>
+              {columns.map((col, idx) => (
+                <div key={idx} className="flex items-center mb-2 gap-2">
+                  <input
+                    type="text"
+                    value={col}
+                    onChange={e => handleChangeColumn(idx, e.target.value)}
+                    placeholder={`Column ${idx + 1}`}
+                    className="flex-1 px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-400"
+                  />
+                  {columns.length > 1 && (
+                    <button
+                      type="button"
+                      onClick={() => handleRemoveColumn(idx)}
+                      className="text-red-500 hover:text-red-700 font-bold text-lg px-2"
+                      title="Remove column"
+                    >
+                      ×
+                    </button>
+                  )}
+                </div>
+              ))}
+
+              <button
+                type="button"
+                onClick={handleAddColumn}
+                className="mt-2 text-blue-600 hover:text-blue-800 text-sm"
+              >
+                + Add another column
+              </button>
+            </div>
+
+            {/* Error Message */}
+            {error && <p className="text-red-600 text-sm mb-4">{error}</p>}
+
+            {/* Actions */}
+            <div className="flex justify-end space-x-4 mt-6">
               <button
                 type="button"
                 onClick={onClose}
-                className="px-4 py-2 bg-gray-200 rounded hover:bg-gray-300"
+                className="px-4 py-2 bg-gray-200 rounded hover:bg-gray-300 transition"
               >
                 Cancel
               </button>
               <button
                 type="submit"
                 disabled={loading}
-                className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
+                className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 transition"
               >
                 {loading ? 'Creating...' : 'Create'}
               </button>
