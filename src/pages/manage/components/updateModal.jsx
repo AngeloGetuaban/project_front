@@ -1,15 +1,21 @@
 import React, { useState, useRef } from 'react';
 import axios from 'axios';
 
-const UpdateModal = ({ sheet, onClose }) => {
+const UpdateModal = ({ sheet, onClose, setAlert }) => {
   const API_URL = import.meta.env.VITE_API_URL;
-  const [rowData, setRowData] = useState(
-    (sheet.columns || []).reduce((acc, col) => ({ ...acc, [col]: '' }), {})
+
+  // ✅ Safely initialize rowData from sheet.columns using lazy initializer
+  const [rowData, setRowData] = useState(() =>
+    (sheet?.columns || []).reduce((acc, col) => ({ ...acc, [col]: '' }), {})
   );
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const [uploadMode, setUploadMode] = useState(false);
+
   const fileInputRef = useRef();
+
+  // ✅ Guard rendering if sheet or its columns are missing
+  if (!sheet || !sheet.columns) return null;
 
   const handleInputChange = (col, value) => {
     setRowData(prev => ({ ...prev, [col]: value }));
@@ -34,9 +40,11 @@ const UpdateModal = ({ sheet, onClose }) => {
         rows: [values],
       });
 
+      setAlert({ message: 'Row added successfully!', type: 'success' });
       onClose();
     } catch (err) {
       const msg = err.response?.data?.message || 'Failed to append row.';
+      setAlert({ message: msg, type: 'error' });
       setError(msg);
     } finally {
       setLoading(false);
@@ -52,7 +60,7 @@ const UpdateModal = ({ sheet, onClose }) => {
     const formData = new FormData();
     formData.append('file', fileInputRef.current.files[0]);
     formData.append('sheet_id', sheet.sheet_id);
-    formData.append('tab_name', sheet.database_name);
+    formData.append('database_name', sheet.database_name);
 
     setLoading(true);
     setError('');
@@ -62,9 +70,11 @@ const UpdateModal = ({ sheet, onClose }) => {
         headers: { 'Content-Type': 'multipart/form-data' },
       });
 
+      setAlert({ message: 'CSV uploaded successfully!', type: 'success' });
       onClose();
     } catch (err) {
       const msg = err.response?.data?.message || 'CSV upload failed.';
+      setAlert({ message: msg, type: 'error' });
       setError(msg);
     } finally {
       setLoading(false);
@@ -97,7 +107,7 @@ const UpdateModal = ({ sheet, onClose }) => {
 
         {!uploadMode && (
           <form onSubmit={handleRowSubmit}>
-            {(sheet.columns || []).map((col, idx) => (
+            {sheet.columns.map((col, idx) => (
               <div key={idx} className="mb-3">
                 <label className="block text-sm font-medium mb-1">{col}</label>
                 <input

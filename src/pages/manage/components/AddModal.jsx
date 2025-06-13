@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import axios from 'axios';
 import { useAuth } from '../../../auth/authContext';
 
-const AddModal = ({ onClose, onCreated }) => {
+const AddModal = ({ onClose, onCreated, setAlert }) => {
   const { user } = useAuth();
   const API_URL = import.meta.env.VITE_API_URL;
 
@@ -61,11 +61,12 @@ const AddModal = ({ onClose, onCreated }) => {
         columns,
       });
 
+      setAlert({ message: 'Sheet created successfully!', type: 'success' });
       if (onCreated) onCreated();
       onClose();
     } catch (err) {
       const msg = err.response?.data?.message || 'Failed to create sheet.';
-      setError(msg);
+      setAlert({ message: msg, type: 'error' });
     } finally {
       setLoading(false);
     }

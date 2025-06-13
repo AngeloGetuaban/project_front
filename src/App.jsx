@@ -11,10 +11,9 @@ import DepartmentManagement from './pages/settings/DepartmentManagement';
 import ProtectedAdminRoute from './auth/protectedAdminRoute';
 import ProtectedSuperAdminRoute from './auth/protectedSuperAdminRoute';
 
-
 function App() {
   return (
-    <Router>
+    <Router basename="/database">
       <Routes>
         <Route path="/" element={<Login />} />
         <Route path="/home" element={<Home />} />
@@ -35,9 +34,9 @@ function App() {
           <Route
             path="department"
             element={
-            <ProtectedSuperAdminRoute>
-              <DepartmentManagement />
-            </ProtectedSuperAdminRoute>
+              <ProtectedSuperAdminRoute>
+                <DepartmentManagement />
+              </ProtectedSuperAdminRoute>
             }
           />
         </Route>

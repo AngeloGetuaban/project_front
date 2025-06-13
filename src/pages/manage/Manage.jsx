@@ -4,7 +4,8 @@ import axios from 'axios';
 import Container from './components/Container';
 import AddModal from './components/AddModal';
 import UpdateModal from './components/updateModal';
-import SpinnerOverlay from '../../components/spinningOverlay'; // <-- Spinner component
+import SpinnerOverlay from '../../components/spinningOverlay';
+import CustomAlert from '../../components/CustomAlert';
 
 const Manage = () => {
   const [showAddModal, setShowAddModal] = useState(false);
@@ -13,7 +14,8 @@ const Manage = () => {
   const [sheets, setSheets] = useState([]);
   const [mode, setMode] = useState('none');
   const [selectedSheets, setSelectedSheets] = useState([]);
-  const [loading, setLoading] = useState(true); // <-- loading state
+  const [loading, setLoading] = useState(true);
+  const [alert, setAlert] = useState(null);
 
   const navigate = useNavigate();
   const API_URL = import.meta.env.VITE_API_URL;
@@ -54,6 +56,60 @@ const Manage = () => {
     }
   };
 
+  const handleDeleteSheets = async () => {
+    if (selectedSheets.length === 0) {
+      setAlert({ message: 'No sheets selected for deletion.', type: 'error' });
+      return;
+    }
+
+    try {
+      setLoading(true);
+
+      for (const sheetId of selectedSheets) {
+        const sheet = sheets.find(s => s.id === sheetId);
+        if (sheet) {
+          await axios.delete(`${API_URL}/api/database/delete`, {
+            data: {
+              sheet_id: sheet.sheet_id,
+              tab_name: sheet.database_name
+            }
+          });
+        }
+      }
+
+      setAlert({ message: 'Selected sheets deleted successfully.', type: 'success' });
+      resetMode();
+      fetchSheets();
+    } catch (err) {
+      const msg = err.response?.data?.message || 'Failed to delete one or more sheets.';
+      setAlert({ message: msg, type: 'error' });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+const groupSheetsByFile = () => {
+  const groups = {};
+
+  sheets.forEach(sheet => {
+    if (sheet.database_name === 'Sheet1') return;
+
+    const id = sheet.sheet_id;
+    if (!groups[id]) {
+      groups[id] = {
+        ...sheet,
+        tabs: [],
+      };
+    }
+    groups[id].tabs.push({
+      tab_name: sheet.database_name,
+      tab_id: sheet.id,
+    });
+  });
+
+  return Object.values(groups);
+};
+
   return (
     <div className="relative min-h-screen bg-gradient-to-br from-gray-200 via-gray-400 to-gray-600 p-10 text-center">
       {loading && <SpinnerOverlay />}
@@ -83,29 +139,57 @@ const Manage = () => {
         </div>
       </div>
 
+      {mode === 'delete' && selectedSheets.length > 0 && (
+        <button
+          onClick={handleDeleteSheets}
+          className="mb-6 bg-red-600 text-white px-6 py-2 rounded shadow hover:bg-red-700 z-20"
+        >
+          Delete Selected Sheets
+        </button>
+      )}
+
       <div className="bg-white rounded-lg shadow-md max-w-6xl mx-auto p-6 text-left relative z-20">
         <h2 className="text-xl font-semibold mb-4">Available Databases</h2>
         {sheets.length === 0 ? (
           <p className="text-gray-500">No Google Sheets found.</p>
         ) : (
-          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
-            {sheets.map((sheet, idx) => (
-              <div
-                key={sheet.id || idx}
-                onClick={() => handleSheetClick(sheet)}
-                className="flex items-center justify-between gap-2 p-4 border border-gray-200 rounded-lg shadow-sm bg-white hover:bg-gray-100 cursor-pointer"
-              >
-                {mode === 'delete' && (
-                  <input
-                    type="checkbox"
-                    checked={selectedSheets.includes(sheet.id)}
-                    onChange={() => toggleSelect(sheet.id)}
-                    className="w-4 h-4"
-                  />
-                )}
-                <div className="flex-1 text-gray-800 font-medium">
-                  {sheet.database_name || sheet.name}
-                </div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-8">
+            {groupSheetsByFile().map((group, idx) => (
+              <div key={group.sheet_id || idx} className="bg-white border border-gray-200 rounded-lg shadow-sm p-4">
+                <h3 className="text-lg font-bold text-gray-800 mb-2">
+                  {group.department_name || 'Untitled'} - Google Sheet
+                </h3>
+                <ul className="space-y-2">
+                  {group.tabs.map((tab, i) => {
+                    const isSelected = selectedSheets.includes(tab.tab_id);
+                    return (
+                      <li
+                        key={tab.tab_id || i}
+                        onClick={() =>
+                          handleSheetClick({ ...group, database_name: tab.tab_name, id: tab.tab_id })
+                        }
+                        className={`px-3 py-2 rounded cursor-pointer text-left border 
+                          ${mode === 'delete' && isSelected ? 'bg-red-100 border-red-400' : 'hover:bg-gray-100'}`
+                        }
+                      >
+                        <div className="flex items-center justify-between">
+                          <span className="text-gray-700">{tab.tab_name}</span>
+                          {mode === 'delete' && (
+                            <input
+                              type="checkbox"
+                              checked={isSelected}
+                              onChange={(e) => {
+                                e.stopPropagation();
+                                toggleSelect(tab.tab_id);
+                              }}
+                              className="w-4 h-4 ml-2"
+                            />
+                          )}
+                        </div>
+                      </li>
+                    );
+                  })}
+                </ul>
               </div>
             ))}
           </div>
@@ -113,16 +197,30 @@ const Manage = () => {
       </div>
 
       {showAddModal && (
-        <AddModal onClose={() => setShowAddModal(false)} onCreated={fetchSheets} />
+        <AddModal
+          onClose={() => setShowAddModal(false)}
+          onCreated={fetchSheets}
+          setAlert={setAlert}
+        />
       )}
-      {showUpdateModal && (
+
+      {showUpdateModal && activeSheet && (
         <UpdateModal
           sheet={activeSheet}
+          setAlert={setAlert}
           onClose={() => {
             setShowUpdateModal(false);
             setActiveSheet(null);
             fetchSheets();
           }}
+        />
+      )}
+
+      {alert && (
+        <CustomAlert
+          message={alert.message}
+          type={alert.type}
+          onClose={() => setAlert(null)}
         />
       )}
     </div>
