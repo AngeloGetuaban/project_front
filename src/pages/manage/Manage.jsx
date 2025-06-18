@@ -125,7 +125,7 @@ const groupSheetsByFile = () => {
         ← Back to Home
       </button>
 
-      <h1 className="text-3xl font-bold text-white mb-10 relative z-20">Manage Google Sheets</h1>
+      <h1 className="text-3xl font-bold text-white mb-10 relative z-20">Manage Database</h1>
 
       <div className="flex justify-center gap-10 mb-10 relative z-20">
         <div className={mode !== 'none' && mode !== 'add' ? 'opacity-40 pointer-events-none' : ''}>
@@ -144,20 +144,20 @@ const groupSheetsByFile = () => {
           onClick={handleDeleteSheets}
           className="mb-6 bg-red-600 text-white px-6 py-2 rounded shadow hover:bg-red-700 z-20"
         >
-          Delete Selected Sheets
+          Delete Selected Database
         </button>
       )}
 
       <div className="bg-white rounded-lg shadow-md max-w-6xl mx-auto p-6 text-left relative z-20">
         <h2 className="text-xl font-semibold mb-4">Available Databases</h2>
         {sheets.length === 0 ? (
-          <p className="text-gray-500">No Google Sheets found.</p>
+          <p className="text-gray-500">No Databases found.</p>
         ) : (
           <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-8">
             {groupSheetsByFile().map((group, idx) => (
               <div key={group.sheet_id || idx} className="bg-white border border-gray-200 rounded-lg shadow-sm p-4">
                 <h3 className="text-lg font-bold text-gray-800 mb-2">
-                  {group.department_name || 'Untitled'} - Google Sheet
+                  {group.department_name || 'Untitled'} - Database
                 </h3>
                 <ul className="space-y-2">
                   {group.tabs.map((tab, i) => {

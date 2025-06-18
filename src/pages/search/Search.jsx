@@ -38,10 +38,11 @@ const Search = () => {
     axios.get(`${API_URL}/api/database/databases`)
       .then(res => {
         const grouped = {};
-        res.data.sheets.forEach(db => {
-          if (!grouped[db.department_name]) grouped[db.department_name] = [];
-          grouped[db.department_name].push(db);
-        });
+          res.data.sheets.forEach(db => {
+            if (db.database_name === 'Sheet1') return; // ✅ Skip Sheet1
+            if (!grouped[db.department_name]) grouped[db.department_name] = [];
+            grouped[db.department_name].push(db);
+          });
         setDatabasesByDept(grouped);
       })
       .catch(err => console.error('Failed to fetch database list:', err))
@@ -161,7 +162,7 @@ const Search = () => {
       {loadingDatabases && <SpinnerOverlay message="Loading databases..." />}
       {loadingTableData && <SpinnerOverlay message="Unlocking and loading data..." />}
 
-      <div className="p-10 max-w-6xl mx-auto">
+      <div className="px-4 sm:px-6 md:px-10 py-10 max-w-screen-xl mx-auto w-full">
         <h2 className="text-2xl font-semibold text-white mb-6">Select a Database</h2>
         <button
           onClick={() => navigate('/home')}
@@ -170,22 +171,34 @@ const Search = () => {
           ← Back to Home
         </button>
 
-        {Object.entries(databasesByDept).map(([dept, list]) => (
-          <div key={dept} className="mb-8">
-            <h3 className="text-lg text-white font-semibold mb-2">{dept}</h3>
-            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-              {list.map(db => (
-                <div
-                  key={db.id}
-                  className="cursor-pointer p-4 rounded-xl shadow-md bg-white hover:bg-blue-600 hover:text-white"
-                  onClick={() => handleSelectDatabase(db)}
-                >
-                  {db.database_name}
-                </div>
-              ))}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 p-6">
+          {Object.entries(databasesByDept).map(([dept, list]) => (
+            <div key={dept} className="flex flex-col gap-4">
+              <h3 className="text-lg text-white font-semibold">{dept}</h3>
+                {list.map(db => {
+                  const isCurrent = isUnlocked && selectedDatabase?.id === db.id;
+                  return (
+                    <div
+                      key={db.id}
+                      className={`p-4 rounded-xl shadow-md break-words transition-all duration-200 ${
+                        isCurrent
+                          ? 'bg-blue-600 text-white cursor-not-allowed'
+                          : 'bg-white text-gray-800 hover:bg-blue-600 hover:text-white cursor-pointer'
+                      }`}
+                      onClick={() => {
+                        if (!isCurrent) handleSelectDatabase(db);
+                      }}
+                    >
+                      <span className="block break-words whitespace-normal">
+                        {db.database_name}
+                      </span>
+                    </div>
+                  );
+                })}
             </div>
-          </div>
-        ))}
+          ))}
+        </div>
+
 
         {/* Password Modal */}
         {selectedDatabase && !isUnlocked && !loadingTableData && (
@@ -211,7 +224,9 @@ const Search = () => {
         {isUnlocked && (
           <div className="bg-white shadow-md rounded-xl px-6 py-4 mt-10">
             <div className="flex items-center justify-between mb-4">
-              <h2 className="text-xl font-semibold">Results ({filteredRows.length})</h2>
+              <h2 className="text-xl font-semibold">
+                  {selectedDatabase?.database_name} ({filteredRows.length})
+                </h2>
               <div className="relative">
                 <button
                   className="bg-blue-600 text-white px-4 py-2 rounded-lg"
